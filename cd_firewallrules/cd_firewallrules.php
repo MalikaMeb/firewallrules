@@ -1,6 +1,7 @@
 <?php
 # Plugin "Firewall Rules" OCSInventory
-# Author: Léa DROGUETT
+# Author: Léa DROGUET
+# Contributor : Malika Mebrouk (adding columns for source/destination ports, comments, and other metadata)
 
  /**
   * This file is used to build a table refering to the plugin and define its 
@@ -35,42 +36,50 @@ $item = info($protectedGet, $protectedPost['systemid'] ?? '');
 
 echo open_form($form_name);
 
+
 if (preg_match('/unix/', $item->USERAGENT)) {
     $list_fields = array(
-        'Name' => 'DISPLAYNAME',
-        'Description' => 'DESCRIPTION',
-        'Source' => 'SOURCE',
-        'Destination' => 'DESTINATION',
-        'Action' => 'ACTION',
-        'Protocol' => 'PROTOCOL',
-        'Port' => 'PORT');
+        'Name'             => 'DISPLAYNAME',
+        'Source'           => 'SOURCE',
+        'Source Port'      => 'SOURCE_PORT',
+        'Destination'      => 'DESTINATION',
+        'Destination Port' => 'DESTINATION_PORT',
+        'Action'           => 'ACTION',
+        'Protocol'         => 'PROTOCOL',
+        'Comment'          => 'COMMENT',
+        'Other'            => 'OTHER',
+    );
 } else {
     $list_fields = array(
-        'Name' => 'DISPLAYNAME',
-        'Description' => 'DESCRIPTION',
-        'Enabled' => 'ENABLED',
-        'Direction' => 'DIRECTION',
-        'Action' => 'ACTION',
-        'Protocol' => 'PROTOCOL',
-        'Port' => 'PORT');
+        'Name'             => 'DISPLAYNAME',
+        'Enabled'          => 'ENABLED',
+        'Direction'        => 'DIRECTION',
+        'Source'           => 'SOURCE',
+        'Source Port'      => 'SOURCE_PORT',
+	'Destination'      => 'DESTINATION',
+        'Destination Port' => 'DESTINATION_PORT',
+        'Action'           => 'ACTION',
+        'Protocol'         => 'PROTOCOL',
+        'Comment'          => 'COMMENT',
+        'Other'            => 'OTHER',
+    );
 }
 
-
-// columns to include at any time and default columns
+// Columns to include at any time and default columns
 $list_col_cant_del = $list_fields;
 $default_fields = $list_fields;
 
-// select columns for table display
+// Select columns for table display
 $sql = prepare_sql_tab($list_fields);
-$sql['SQL']  .= "FROM firewallrules WHERE (hardware_id = $systemid)";
+$sql['SQL']  .= " FROM firewallrules WHERE (hardware_id = $systemid)";
 
 array_push($sql['ARG'], $systemid);
 $tab_options['ARG_SQL'] = $sql['ARG'];
 $tab_options['ARG_SQL_COUNT'] = $systemid;
+
 ajaxtab_entete_fixe($list_fields, $default_fields, $tab_options, $list_col_cant_del);
 
 echo close_form();
-
 
 if ($ajax) {
     ob_end_clean();
