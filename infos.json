@@ -1,9 +1,9 @@
 {
     "displayName" : "Firewall Rules",
     "author" : ["Léa DROGUET"],
-    "contributor" : [],
+    "contributor" : ["Malika MEBROUK"],
     "supportedAgent" : ["Unix", "Windows"],
-    "version" : "1",
+    "version" : "2.1",
     "licence" : "GPLv2",
     "description" : 
         {
