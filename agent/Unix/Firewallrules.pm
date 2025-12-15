@@ -1,37 +1,73 @@
 # Plugin "Firewall Rules" OCSInventory
-# Author: Lea DROGUET
-# Contributor : Malika Mebrouk (rewrites parsing to be chain-aware (INPUT/OUTPUT/FORWARD), uses verbose iptables output per chain, properly parses and maps protocol numbers, extracts comments and src/dst ports (including ranges), tracks interfaces and other flags)
+# Author: Léa DROGUET
+# Contributor : Malika Mebrouk (rewrites parsing to be chain-aware (INPUT/OUTPUT/FORWARD), uses verbose iptables output per chain, properly parses and maps protocol numbers, extracts comments and src/dst ports (including ranges), tracks interfaces and other flags), IPV6 support
 
 package Ocsinventory::Agent::Modules::Firewallrules;
 
 sub new {
-    my $name = "firewallrules";
-    my (undef, $context) = @_;
+    my ($class, $context) = @_;
     my $self = {};
+    bless $self, $class;
 
-    $self->{logger} = new Ocsinventory::Logger({
+    $self->{logger} = Ocsinventory::Logger->new({
         config => $context->{config}
     });
-    $self->{logger}->{header} = "[$name]";
+    $self->{logger}->{header} = "[firewallrules]";
     $self->{context} = $context;
     $self->{structure} = {
-        name => $name,
-        inventory_handler => $name . "_inventory_handler",
+        name => "firewallrules",
+        inventory_handler => "firewallrules_inventory_handler",
     };
-    bless $self;
+
+    # Static protocol map including IPv4 and IPv6 essential protocols
+    $self->{proto_map} = {
+        # IPv4 protocols
+        0  => 'IP',
+        1  => 'ICMP',
+        2  => 'IGMP',
+        3  => 'GGP',
+        4  => 'IP-ENCAP',
+        5  => 'ST',
+        6  => 'TCP',
+        7  => 'CBT',
+        8  => 'EGP',
+        9  => 'IGP',
+        12 => 'PUP',
+        17 => 'UDP',
+        20 => 'HMP',
+        22 => 'XNS-IDP',
+        27 => 'RDP',
+        29 => 'ISO-TP4',
+        33 => 'DCCP',
+        36 => 'XTP',
+        37 => 'DDP',
+        # IPv6 protocols
+        41  => 'IPv6',
+        43  => 'IPv6-Route',
+        44  => 'IPv6-Frag',
+        46  => 'RSVP',
+        47  => 'GRE',
+        50  => 'IPSEC-ESP',
+        51  => 'IPSEC-AH',
+        58  => 'IPv6-ICMP',
+        59  => 'IPv6-NoNxt',
+        60  => 'IPv6-Opts',
+        88  => 'EIGRP',
+        89  => 'OSPFIGP',
+        103 => 'PIM',
+        108 => 'IPCOMP',
+        132 => 'SCTP',
+    };
+
+    return $self;
 }
 
-my %proto_map = (
-    0 => 'IP',    1 => 'ICMP',   2 => 'IGMP',   3 => 'GGP',
-    4 => 'IP-ENCAP', 5 => 'ST',  6 => 'TCP',    8 => 'EGP',
-    9 => 'IGP',   12 => 'PUP',   17 => 'UDP'
-); #add others if needed (see /etc/protocols)
-
 sub firewallrules_inventory_handler {
-    my $self = shift;
+    my ($self) = @_;
     my $logger = $self->{logger};
     my $common = $self->{context}->{common};
     my $current_chain = '';
+    my %proto_map = %{ $self->{proto_map} };
 
     foreach my $line (_getFirewallRules()) {
         next if $line =~ /^pkts\s+bytes\s+target/i;
@@ -39,7 +75,9 @@ sub firewallrules_inventory_handler {
         next if $line =~ /description/i;
 
         if ($line =~ /^Chain\s+(\S+)/) {
-            $current_chain = $1;
+            my $chain = $1;
+            $chain =~ s/\(IPv[46]\)//;   # remove (IPv4) or (IPv6) suffix
+            $current_chain = $chain;
             next;
         }
 
@@ -69,7 +107,7 @@ sub firewallrules_inventory_handler {
             my ($pkts, $bytes, $action, $protocol_num, $opt, $in_if, $out_if, $source, $destination, $rest) =
                 ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 
-            # Skip header lines by comparing lowercase strings
+            # Skip header lines
             if (
                 lc($source) eq 'source' or
                 lc($destination) eq 'destination' or
@@ -81,6 +119,8 @@ sub firewallrules_inventory_handler {
                 next;
             }
 
+            # Remove non-digit chars and map number to name
+            $protocol_num =~ s/\D//g;
             my $protocol = exists $proto_map{$protocol_num} ? $proto_map{$protocol_num} : $protocol_num;
 
             # Extract comment enclosed in /* ... */
@@ -90,25 +130,23 @@ sub firewallrules_inventory_handler {
                 $rest =~ s/\/\*\s*\Q$comment\E\s*\*\///g;
             }
 
-            # Extract destination port(s) - support range/multi e.g. 67:68
+            # Extract destination ports
             my $dst_port = '';
             if ($rest =~ /dpts?:([\d:]+)/) {
                 $dst_port = $1;
                 $rest =~ s/dpts?:[\d:]+//g;
             }
 
-            # Extract source port(s) - support range/multi e.g. 1024:65535
+            # Extract source ports
             my $src_port = '';
             if ($rest =~ /spts?:([\d:]+)/) {
                 $src_port = $1;
                 $rest =~ s/spts?:[\d:]+//g;
             }
 
-            # Trim leading/trailing whitespace in rest
             $rest =~ s/^\s+|\s+$//g;
             my $other = $rest;
 
-            # Append input/output interfaces to other info if present
             if (defined $in_if && $in_if ne '*' && $in_if ne '') {
                 $other = "in = $in_if" . ($other ? " $other" : '');
             }
@@ -123,7 +161,7 @@ sub firewallrules_inventory_handler {
                 SOURCE           => [$source],
                 SOURCE_PORT      => [$src_port],
                 DESTINATION      => [$destination],
-                DESTINATION_PORT => [$dst_port], 
+                DESTINATION_PORT => [$dst_port],
                 ACTION           => [$action],
                 PROTOCOL         => [$protocol],
                 COMMENT          => [$comment],
@@ -137,12 +175,15 @@ sub firewallrules_inventory_handler {
 
 sub _getFirewallRules {
     my @all_rules;
-    for my $chain ('INPUT', 'OUTPUT', 'FORWARD') {
-        push @all_rules, "Chain $chain\n";
-        push @all_rules, `iptables -L $chain -n -v`;
+    for my $cmd (['iptables', 'IPv4'], ['ip6tables', 'IPv6']) {
+        my ($bin, $ver) = @$cmd;
+        for my $chain ('INPUT', 'OUTPUT', 'FORWARD') {
+            push @all_rules, "Chain $chain ($ver)\n";
+            my @rules = `$bin -L $chain -n -v 2>/dev/null`;
+            push @all_rules, @rules;
+        }
     }
     return @all_rules;
 }
 
 1;
-
