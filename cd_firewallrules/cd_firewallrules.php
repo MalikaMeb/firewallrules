@@ -1,12 +1,11 @@
 <?php
-# Plugin "Firewall Rules" OCSInventory
-# Author: Léa DROGUET
-# Contributor : Malika Mebrouk (adding columns for source/destination ports, comments, and other metadata)
-
- /**
-  * This file is used to build a table refering to the plugin and define its 
-  * default columns as well as SQL request.
-  */
+// Plugin "Firewall Rules" OCSInventory
+// Author: Léa DROGUET
+// Contributor : Malika Mebrouk (adding columns for direction, source/destination ports, comments, and other metadata)
+/**
+ * This file is used to build a table referring to the plugin and define its
+ * default columns as well as SQL request.
+ */
 
 if (AJAX) {
     parse_str($protectedPost['ocs']['0'], $params);
@@ -16,7 +15,6 @@ if (AJAX) {
 } else {
     $ajax = false;
 }
-
 
 // print a title for the table
 print_item_header($l->g(1234));
@@ -36,10 +34,9 @@ $item = info($protectedGet, $protectedPost['systemid'] ?? '');
 
 echo open_form($form_name);
 
-
 if (preg_match('/unix/', $item->USERAGENT)) {
     $list_fields = array(
-        'Name'             => 'DISPLAYNAME',
+        'Direction'        => 'DIRECTION',
         'Source'           => 'SOURCE',
         'Source Port'      => 'SOURCE_PORT',
         'Destination'      => 'DESTINATION',
@@ -51,12 +48,11 @@ if (preg_match('/unix/', $item->USERAGENT)) {
     );
 } else {
     $list_fields = array(
-        'Name'             => 'DISPLAYNAME',
-        'Enabled'          => 'ENABLED',
         'Direction'        => 'DIRECTION',
+        'Enabled'          => 'ENABLED',
         'Source'           => 'SOURCE',
         'Source Port'      => 'SOURCE_PORT',
-	'Destination'      => 'DESTINATION',
+        'Destination'      => 'DESTINATION',
         'Destination Port' => 'DESTINATION_PORT',
         'Action'           => 'ACTION',
         'Protocol'         => 'PROTOCOL',

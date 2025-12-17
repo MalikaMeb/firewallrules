@@ -1,6 +1,6 @@
 # Plugin "Firewall Rules" OCSInventory
 # Author: Léa DROGUET
-# Contributor : Malika Mebrouk (added fields: SOURCE_PORT, DESTINATION_PORT, COMMENT, and OTHER)
+# Contributor : Malika Mebrouk (added fields: DIRECTION, SOURCE_PORT, DESTINATION_PORT, COMMENT, and OTHER)
 
 package Apache::Ocsinventory::Plugins::Firewallrules::Map;
 
@@ -17,12 +17,11 @@ $DATA_MAP{firewallrules} = {
    cache => 0,
    fields => {
        RULE_ID          => {},
-       DISPLAYNAME      => {},
+       DIRECTION        => {},
        SOURCE           => {},
        SOURCE_PORT      => {},
        DESTINATION      => {},
        DESTINATION_PORT => {},
-       DIRECTION        => {},
        ACTION           => {},
        PROTOCOL         => {},
        COMMENT          => {},

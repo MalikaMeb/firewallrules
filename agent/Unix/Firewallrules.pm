@@ -1,6 +1,6 @@
 # Plugin "Firewall Rules" OCSInventory
 # Author: Léa DROGUET
-# Contributor : Malika Mebrouk (rewrites parsing to be chain-aware (INPUT/OUTPUT/FORWARD), uses verbose iptables output per chain, properly parses and maps protocol numbers, extracts comments and src/dst ports (including ranges), tracks interfaces and other flags), IPV6 support
+# Contributor : Malika Mebrouk (rewrites parsing to be chain-aware (INPUT/OUTPUT/FORWARD) for Direction, uses verbose iptables output per chain, properly parses and maps protocol numbers, extracts comments and src/dst ports (including ranges), tracks interfaces and other flags), IPV6 support
 
 package Ocsinventory::Agent::Modules::Firewallrules;
 
@@ -19,7 +19,7 @@ sub new {
         inventory_handler => "firewallrules_inventory_handler",
     };
 
-    # Static protocol map including IPv4 and IPv6 essential protocols
+    # Static protocol map 
     $self->{proto_map} = {
         # IPv4 protocols
         0  => 'IP',
@@ -81,13 +81,13 @@ sub firewallrules_inventory_handler {
             next;
         }
 
-        my $displayName = "iptables";
+        my $direction = "iptables";
         if ($current_chain eq 'INPUT') {
-            $displayName = "INPUT";
+            $direction = "INPUT";
         } elsif ($current_chain eq 'OUTPUT') {
-            $displayName = "OUTPUT";
+            $direction = "OUTPUT";
         } elsif ($current_chain eq 'FORWARD') {
-            $displayName = "FORWARD";
+            $direction = "FORWARD";
         }
 
         if (
@@ -157,7 +157,7 @@ sub firewallrules_inventory_handler {
             $logger->debug("Parsed rule: action=$action, protocol=$protocol, source=$source, source_port=$src_port, destination=$destination, destination_port=$dst_port, comment=$comment, other=$other, chain=$current_chain");
 
             push @{$common->{xmltags}->{FIREWALLRULES}}, {
-                DISPLAYNAME      => [$displayName],
+                DIRECTION        => [$direction],
                 SOURCE           => [$source],
                 SOURCE_PORT      => [$src_port],
                 DESTINATION      => [$destination],
