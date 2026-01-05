@@ -1,6 +1,6 @@
 # Plugin "Firewall Rules" OCSInventory
 # Author: Léa DROGUET
-# Contributor : Malika Mebrouk (rewrites parsing to be chain-aware (INPUT/OUTPUT/FORWARD) for Direction, uses verbose iptables output per chain, properly parses and maps protocol numbers, extracts comments and src/dst ports (including ranges), tracks interfaces and other flags), IPV6 support
+# Contributor : Malika Mebrouk (rewrites parsing to be chain-aware (INPUT/OUTPUT/FORWARD) for Direction, uses verbose iptables output per chain, properly parses and maps protocol numbers, extracts comments and src/dst ports (including ranges), tracks interfaces and other flags, IPV6 support)
 
 package Ocsinventory::Agent::Modules::Firewallrules;
 
@@ -19,7 +19,7 @@ sub new {
         inventory_handler => "firewallrules_inventory_handler",
     };
 
-    # Static protocol map 
+    # Static protocol map including IPv4 and IPv6 essential protocols
     $self->{proto_map} = {
         # IPv4 protocols
         0  => 'IP',
@@ -90,22 +90,32 @@ sub firewallrules_inventory_handler {
             $direction = "FORWARD";
         }
 
-        if (
-            $line =~ /^\s*
-            (\S+)\s+         # pkts
-            (\S+)\s+         # bytes
-            (\S+)\s+         # action
-            (\S+)\s+         # protocol_num
-            (\S+)\s+         # opt
-            (\S+)\s+         # in_if
-            (\S+)\s+         # out_if
-            (\S+)\s+         # source
-            (\S+)\s+         # destination
-            (.*)             # rest
-            $/x
-        ) {
-            my ($pkts, $bytes, $action, $protocol_num, $opt, $in_if, $out_if, $source, $destination, $rest) =
-                ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+        # Trim the line first
+        $line =~ s/^\s+|\s+$//g;
+        
+        # Skip empty lines after trimming
+        next if $line eq '';
+        
+        # Split line on whitespace to handle variable spacing
+        my @fields = split(/\s+/, $line);
+        
+        # Need at least 8 fields (pkts bytes target prot opt in out source destination)
+        if (@fields >= 8) {
+            my ($pkts, $bytes, $action, $protocol_num, $opt, $in_if, $out_if, $source, $destination);
+            
+            # Standard format: pkts bytes target prot opt in out source dest [rest]
+            $pkts = $fields[0];
+            $bytes = $fields[1];
+            $action = $fields[2];
+            $protocol_num = $fields[3];
+            $opt = $fields[4];
+            $in_if = $fields[5];
+            $out_if = $fields[6];
+            $source = $fields[7];
+            $destination = $fields[8] // '';  # May not exist for 8-field lines
+            
+            # Rest of the fields (if any) - join remaining fields beyond position 8
+            my $rest = (@fields > 9) ? join(' ', @fields[9..$#fields]) : '';
 
             # Skip header lines
             if (
@@ -168,7 +178,9 @@ sub firewallrules_inventory_handler {
                 OTHER            => [$other]
             };
         } else {
-            $logger->debug("Warning: Could not parse firewall rule line: $line");
+            # Enhanced error message with field count
+            my $field_count = scalar(@fields);
+            $logger->debug("Warning: Could not parse firewall rule line (found $field_count fields, need 8+): $line");
         }
     }
 }
